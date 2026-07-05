@@ -161,9 +161,12 @@ main {
   gap: 4px;
   font-size: .85rem;
   color: var(--muted);
+  min-width: 0;
 }
 
 .cat-inputs input {
+  width: 100%;
+  min-width: 0;
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -380,7 +383,7 @@ button.small {
 
 .toast {
   position: fixed;
-  bottom: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   background: var(--text);
@@ -395,7 +398,88 @@ button.small {
 
 .toast.error { background: var(--red); }
 
-@media (max-width: 480px) {
-  .cat-inputs { grid-template-columns: 1fr 1fr; }
+/* ---------- Mobile ---------- */
+
+@media (max-width: 600px) {
+  header {
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 0;
+  }
+
+  header h1 {
+    font-size: 1.15rem;
+    margin-bottom: 8px;
+  }
+
+  nav {
+    margin: 0 -12px;
+    padding: 0 12px;
+    scrollbar-width: none;
+  }
+
+  nav::-webkit-scrollbar { display: none; }
+
+  .tab {
+    flex: 1;
+    padding: 12px 4px;
+    font-size: .82rem;
+  }
+
+  main {
+    padding: 14px 10px calc(40px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .card { padding: 14px 12px; }
+
+  /* Formulare: iOS zoomt bei Schrift < 16px automatisch rein */
+  select, input[type="text"], input[type="url"], input[type="number"] {
+    font-size: 16px !important;
+  }
+
+  /* Eingabe: Jahr + KW nebeneinander, Lohn-Checkbox in voller Breite */
+  .week-picker { gap: 10px; }
+  .week-picker label { flex: 1; min-width: 0; }
+  .week-picker select { width: 100%; }
+  .week-picker .lohn-check {
+    flex: 1 1 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .cat-inputs {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .cat-inputs input { min-height: 44px; }
+
+  .summen { grid-template-columns: 1fr 1fr; }
+
+  #btnSave {
+    width: 100%;
+    min-height: 48px;
+    font-size: 1rem;
+  }
+
+  /* Diagramme */
+  .chart-controls { gap: 12px; }
+  .chart-controls label { flex: 1; }
+  .chart-controls select { flex: 1; min-width: 0; }
   .chart-wrap { height: 240px; }
+
+  /* Kategorien */
+  .cat-row { gap: 8px; }
+  .cat-row .cat-name { flex-basis: 100%; min-width: 0; }
+  .cat-row button.small { min-height: 38px; }
+
+  .add-cat-form input { min-width: 0; flex-basis: 100%; }
+  .add-cat-form select { flex: 1; }
+  .add-cat-form button { flex: 1; min-height: 44px; }
+
+  /* Einstellungen */
+  .btn-row button {
+    flex-basis: 100%;
+    min-height: 44px;
+  }
+
+  .demo-banner { padding: 8px 12px; }
 }

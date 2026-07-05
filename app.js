@@ -13,10 +13,10 @@ const LEVEL_TITEL = {
 const LEVEL_FARBEN = { 1: '#2563eb', 2: '#7c3aed', 3: '#d97706' };
 
 const DEFAULT_KATEGORIEN = [
-  ['RB-Konto', 1], ['TR-Konto', 1], ['UniOpti4', 1], ['Cash', 1],
+  ['Girokonto', 1], ['Tagesgeld', 1], ['Geldmarktfonds', 1], ['Cash', 1],
   ['Sparbücher', 1], ['Kreditkarte', 1], ['PayPal', 1],
   ['Aktien', 2],
-  ['Private Markets', 3], ['Crypto', 3], ['GA-RB', 3], ['Gold', 3], ['Riester', 3],
+  ['Private Markets', 3], ['Crypto', 3], ['Bausparvertrag', 3], ['Gold', 3], ['Riester', 3],
 ];
 
 const state = {
@@ -155,9 +155,10 @@ function startDemo() {
   state.weekData = {};
   const heute = new Date();
   const basis = {
-    'RB-Konto': 2500, 'TR-Konto': 1800, 'UniOpti4': 5000, 'Cash': 300,
-    'Sparbücher': 4000, 'Kreditkarte': -450, 'Paypal': 120,
-    'Aktien': 12000, 'GA-RNB': 8000, 'Gold': 3500, 'Riester': 9500,
+    'Girokonto': 2500, 'Tagesgeld': 1800, 'Geldmarktfonds': 5000, 'Cash': 300,
+    'Sparbücher': 4000, 'Kreditkarte': -450, 'PayPal': 120,
+    'Aktien': 12000, 'Private Markets': 2000, 'Crypto': 1500,
+    'Bausparvertrag': 8000, 'Gold': 3500, 'Riester': 9500,
   };
   // ~90 Wochen Verlauf über den Jahreswechsel hinweg erzeugen
   for (let i = 90; i >= 0; i--) {
@@ -167,7 +168,7 @@ function startDemo() {
     Object.keys(basis).forEach(k => {
       const trend = (90 - i) * (k === 'Aktien' ? 55 : k === 'Kreditkarte' ? -1 : 12);
       const rauschen = Math.sin(i * 1.7 + k.length) * (k === 'Aktien' ? 600 : 90);
-      if (w.lohn && k === 'RB-Konto') basis[k] += 0; // Basis bleibt, Trend reicht
+      if (w.lohn && k === 'Girokonto') basis[k] += 0; // Basis bleibt, Trend reicht
       w.werte[k] = Math.round((basis[k] + trend + rauschen) * 100) / 100;
     });
     state.weekData[wkKey(year, week)] = w;

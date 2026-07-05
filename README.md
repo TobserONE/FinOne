@@ -7,9 +7,9 @@ Statische Web-App (kein eigener Server nötig) + Google Apps Script als Backend.
 
 - **Eintrag je Kalenderwoche** (ISO-KW, mehrjährig eindeutig über Jahr + KW)
 - **3 Level mit eigenem Verlaufsdiagramm** (kumulativ):
-  - **Level 1**: RB-Konto, TR-Konto, UniOpti4, Cash, Sparbücher, Kreditkarte, Paypal
+  - **Level 1**: Girokonto, Tagesgeld, Geldmarktfonds, Cash, Sparbücher, Kreditkarte, PayPal
   - **Level 2**: Level 1 + Aktien
-  - **Level 3**: Level 2 + GA-RNB, Gold, Riester (= Gesamtvermögen)
+  - **Level 3**: Level 2 + Private Markets, Crypto, Bausparvertrag, Gold, Riester (= Gesamtvermögen)
 - **Mehrjährige Darstellung**: Die Diagramme zeigen alle Jahre als durchgehende
   Zeitachse (Beschriftung „KW07 2026“). Über den Zeitraum-Filter kann auf
   „Letzte 12 Monate“ oder ein einzelnes Jahr eingegrenzt werden.
