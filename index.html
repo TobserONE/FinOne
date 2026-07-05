@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Finanz-Tracker</title>
+  <meta name="theme-color" content="#2563eb">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" type="image/png" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+  <script src="chart.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>💰 Finanz-Tracker</h1>
+    <nav>
+      <button class="tab active" data-tab="eingabe">Eingabe</button>
+      <button class="tab" data-tab="diagramme">Diagramme</button>
+      <button class="tab" data-tab="kategorien">Kategorien</button>
+      <button class="tab" data-tab="einstellungen">Einstellungen</button>
+    </nav>
+  </header>
+
+  <div id="demoBanner" class="demo-banner hidden">
+    🧪 Demo-Modus – Daten werden nicht gespeichert.
+    <button id="btnDemoEnde">Beenden</button>
+  </div>
+
+  <main>
+    <!-- ============ EINGABE ============ -->
+    <section id="tab-eingabe" class="tab-panel">
+      <div class="card">
+        <div class="week-picker">
+          <label>Jahr
+            <select id="inpJahr"></select>
+          </label>
+          <label>Kalenderwoche
+            <select id="inpKW"></select>
+          </label>
+          <label class="lohn-check">
+            <input type="checkbox" id="inpLohn">
+            <span>💚 Lohn eingegangen</span>
+          </label>
+        </div>
+        <div id="weekStatus" class="week-status"></div>
+      </div>
+
+      <div id="entryForm"></div>
+
+      <div class="card summen-card">
+        <h2>Summen</h2>
+        <div id="entrySummen" class="summen"></div>
+        <button id="btnSave" class="primary">Woche speichern</button>
+      </div>
+    </section>
+
+    <!-- ============ DIAGRAMME ============ -->
+    <section id="tab-diagramme" class="tab-panel hidden">
+      <div class="card chart-controls">
+        <label>Zeitraum
+          <select id="rangeSelect"></select>
+        </label>
+        <span class="legend-hint"><span class="dot green"></span> Lohnwoche</span>
+      </div>
+      <div class="card chart-card">
+        <h2>Level 1 · Konten &amp; Cash</h2>
+        <div class="chart-wrap"><canvas id="chartL1"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <h2>Level 2 · inkl. Aktien</h2>
+        <div class="chart-wrap"><canvas id="chartL2"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <h2>Level 3 · Gesamtvermögen</h2>
+        <div class="chart-wrap"><canvas id="chartL3"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ============ KATEGORIEN ============ -->
+    <section id="tab-kategorien" class="tab-panel hidden">
+      <div id="catList"></div>
+      <div class="card">
+        <h2>Neue Kategorie</h2>
+        <form id="addCatForm" class="add-cat-form">
+          <input type="text" id="newCatName" placeholder="Name" required>
+          <select id="newCatLevel">
+            <option value="1">Level 1</option>
+            <option value="2">Level 2</option>
+            <option value="3">Level 3</option>
+          </select>
+          <button type="submit" class="primary">Hinzufügen</button>
+        </form>
+        <p class="hint">Deaktivierte Kategorien verschwinden aus der Eingabe, ihre
+          historischen Werte bleiben aber in den Diagrammen enthalten.</p>
+      </div>
+    </section>
+
+    <!-- ============ EINSTELLUNGEN ============ -->
+    <section id="tab-einstellungen" class="tab-panel hidden">
+      <div class="card">
+        <h2>Google-Sheets-Verbindung</h2>
+        <label class="settings-label">Apps-Script Web-App-URL
+          <input type="url" id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec">
+        </label>
+        <label class="settings-label">Token
+          <input type="text" id="cfgToken" placeholder="Geheimes Token aus Code.gs">
+        </label>
+        <div class="btn-row">
+          <button id="btnCfgSave" class="primary">Speichern &amp; verbinden</button>
+          <button id="btnRefresh">Daten neu laden</button>
+          <button id="btnDemo">Demo-Modus starten</button>
+        </div>
+        <p id="connStatus" class="hint"></p>
+      </div>
+      <div class="card">
+        <h2>Einrichtung in 4 Schritten</h2>
+        <ol class="setup-steps">
+          <li>Google Sheet erstellen (z. B. „Finanz-Tracker“).</li>
+          <li>Im Sheet: <em>Erweiterungen → Apps Script</em> öffnen und den Inhalt von
+            <code>apps-script/Code.gs</code> einfügen. Das <code>TOKEN</code> oben im Code ändern.</li>
+          <li><em>Bereitstellen → Neue Bereitstellung → Web-App</em>:
+            Ausführen als <strong>Ich</strong>, Zugriff <strong>Jeder</strong>. URL kopieren.</li>
+          <li>URL und Token hier oben eintragen und „Speichern &amp; verbinden“ klicken.
+            Das Script legt die Tabellenblätter automatisch an.</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>
