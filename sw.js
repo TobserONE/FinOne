@@ -1,11 +1,12 @@
 /* Finanz-Tracker Service Worker – cached die App-Shell für Offline-Start */
-const CACHE = 'finanz-tracker-v6';
+const CACHE = 'finanz-tracker-v8';
 const SHELL = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './chart.min.js',
+  './supabase.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',

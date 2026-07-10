@@ -10,6 +10,7 @@
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
   <script src="chart.min.js"></script>
+  <script src="supabase.js"></script>
 </head>
 <body>
   <header>
@@ -113,30 +114,59 @@
     <!-- ============ EINSTELLUNGEN ============ -->
     <section id="tab-einstellungen" class="tab-panel hidden">
       <div class="card">
-        <h2>Google-Sheets-Verbindung</h2>
-        <label class="settings-label">Apps-Script Web-App-URL
-          <input type="url" id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec">
-        </label>
-        <label class="settings-label">Token
-          <input type="text" id="cfgToken" placeholder="Geheimes Token aus Code.gs">
-        </label>
-        <div class="btn-row">
-          <button id="btnCfgSave" class="primary">Speichern &amp; verbinden</button>
-          <button id="btnRefresh">Daten neu laden</button>
-          <button id="btnDemo">Demo-Modus starten</button>
+        <h2>Cloud-Konto</h2>
+        <div id="authLoggedOut">
+          <label class="settings-label">E-Mail
+            <input type="email" id="authEmail" autocomplete="email" placeholder="du@example.de">
+          </label>
+          <label class="settings-label">Passwort
+            <input type="password" id="authPass" autocomplete="current-password" placeholder="mind. 6 Zeichen">
+          </label>
+          <div class="btn-row">
+            <button id="btnLogin" class="primary">Anmelden</button>
+            <button id="btnSignup">Registrieren</button>
+          </div>
+        </div>
+        <div id="authLoggedIn" class="hidden">
+          <p class="auth-user">Angemeldet als <strong id="authUser"></strong></p>
+          <div class="btn-row">
+            <button id="btnRefresh">Daten neu laden</button>
+            <button id="btnLogout">Abmelden</button>
+          </div>
         </div>
         <p id="connStatus" class="hint"></p>
+        <div class="btn-row demo-row">
+          <button id="btnDemo">Demo-Modus starten</button>
+        </div>
       </div>
+
       <div class="card">
-        <h2>Einrichtung in 4 Schritten</h2>
+        <h2>Einmalige Migration aus Google Sheets</h2>
+        <p class="hint" style="margin: 0 0 12px">Übernimmt alle Kategorien, Wochen und Werte aus dem
+          bisherigen Google Sheet in dein Cloud-Konto. Vorher oben anmelden. Bereits vorhandene
+          Einträge werden dabei überschrieben (gleiche Woche + Kategorie).</p>
+        <label class="settings-label">Apps-Script Web-App-URL
+          <input type="url" id="migUrl" placeholder="https://script.google.com/macros/s/…/exec">
+        </label>
+        <label class="settings-label">Token
+          <input type="text" id="migToken" placeholder="Geheimes Token aus Code.gs">
+        </label>
+        <button id="btnMigrate" class="primary">Daten übernehmen</button>
+        <p id="migStatus" class="hint"></p>
+      </div>
+
+      <div class="card">
+        <h2>Einrichtung (einmalig pro App-Kopie)</h2>
         <ol class="setup-steps">
-          <li>Google Sheet erstellen (z. B. „Finanz-Tracker“).</li>
-          <li>Im Sheet: <em>Erweiterungen → Apps Script</em> öffnen und den Inhalt von
-            <code>apps-script/Code.gs</code> einfügen. Das <code>TOKEN</code> oben im Code ändern.</li>
-          <li><em>Bereitstellen → Neue Bereitstellung → Web-App</em>:
-            Ausführen als <strong>Ich</strong>, Zugriff <strong>Jeder</strong>. URL kopieren.</li>
-          <li>URL und Token hier oben eintragen und „Speichern &amp; verbinden“ klicken.
-            Das Script legt die Tabellenblätter automatisch an.</li>
+          <li>Auf <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> ein
+            kostenloses Projekt anlegen (Region: <strong>Frankfurt</strong>).</li>
+          <li>Im Dashboard: <em>SQL Editor → New query</em>, den Inhalt von
+            <code>supabase-setup.sql</code> einfügen und ausführen.</li>
+          <li>Unter <em>Settings → API</em> die <strong>Project URL</strong> und den
+            <strong>anon public</strong> Key kopieren und oben in <code>app.js</code> bei
+            <code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code> eintragen.</li>
+          <li>Hier registrieren &amp; anmelden – fertig. Weitere Nutzer derselben App-Kopie
+            müssen sich nur registrieren (Schritte 1–3 entfallen).</li>
         </ol>
       </div>
     </section>
