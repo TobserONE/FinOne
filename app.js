@@ -439,8 +439,7 @@ function buildChart(canvasId, lvl, weeks) {
   state.charts[canvasId] = chart;
 }
 
-function renderRangeSelect() {
-  const sel = document.getElementById('rangeSelect');
+function fillRangeSelect(sel) {
   const jahre = [...new Set(sortedWeeks().map(w => w.jahr))].sort((a, b) => b - a);
   const prev = state.range;
   sel.innerHTML = '<option value="alle">Alle Jahre</option>' +
@@ -448,6 +447,11 @@ function renderRangeSelect() {
     jahre.map(j => `<option value="${j}">Nur ${j}</option>`).join('');
   sel.value = [...sel.options].some(o => o.value === String(prev)) ? prev : 'alle';
   state.range = sel.value;
+}
+
+function renderRangeSelect() {
+  const sel = document.getElementById('rangeSelect');
+  fillRangeSelect(sel);
   sel.onchange = () => { state.range = sel.value; renderCharts(); };
 }
 
@@ -471,6 +475,75 @@ function renderCharts() {
       document.getElementById(id).classList.remove('hidden');
       buildChart(id, lvl, weeks);
     }
+  });
+}
+
+// ---------- Tabellen-Tab ----------
+
+function tableColumns(weeks) {
+  const benutzt = new Set();
+  weeks.forEach(w => Object.keys(w.werte).forEach(k => benutzt.add(k)));
+  const cols = [];
+  for (const lvl of [1, 2, 3]) {
+    state.categories.forEach(c => {
+      if (c.level === lvl && (c.aktiv || benutzt.has(c.name))) cols.push(c);
+    });
+  }
+  // Werte ohne bekannte Kategorie (z. B. umbenannt/entfernt) hinten anhängen
+  const bekannt = new Set(state.categories.map(c => c.name));
+  [...benutzt].filter(n => !bekannt.has(n)).sort().forEach(n => cols.push({ name: n, level: 0 }));
+  return cols;
+}
+
+function renderTable() {
+  const sel = document.getElementById('tableRangeSelect');
+  fillRangeSelect(sel);
+  sel.onchange = () => { state.range = sel.value; renderTable(); };
+
+  const wrap = document.getElementById('tableWrap');
+  const weeks = filteredWeeks().slice().reverse(); // neueste zuerst
+  if (!weeks.length) {
+    wrap.innerHTML = '<p class="chart-empty">Noch keine Daten – trage zuerst eine Woche ein.</p>';
+    return;
+  }
+
+  const cols = tableColumns(weeks);
+  const zelle = v => (v === undefined || v === null)
+    ? '<td class="num leer">–</td>'
+    : `<td class="num${v < 0 ? ' neg' : ''}">${EUR.format(v)}</td>`;
+
+  let html = '<table class="data-table"><thead><tr><th class="week-col">Woche</th>';
+  cols.forEach(c => {
+    html += `<th class="num${c.level ? ' lvl-' + c.level : ''}">${c.name}</th>`;
+  });
+  html += '<th class="num total-col">Σ L1</th><th class="num total-col">Σ L2</th>' +
+    '<th class="num total-col">Σ L3</th></tr></thead><tbody>';
+
+  weeks.forEach(w => {
+    html += `<tr data-jahr="${w.jahr}" data-kw="${w.kw}"${w.lohn ? ' class="lohn"' : ''}>` +
+      `<th class="week-col">KW ${String(w.kw).padStart(2, '0')} ${w.jahr}${w.lohn ? ' 💚' : ''}</th>`;
+    cols.forEach(c => { html += zelle(w.werte[c.name]); });
+    [1, 2, 3].forEach(lvl => {
+      const s = levelTotal(w, lvl);
+      html += (s === null)
+        ? '<td class="num total-col leer">–</td>'
+        : `<td class="num total-col${s < 0 ? ' neg' : ''}">${EUR.format(s)}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const jahr = tr.dataset.jahr, kw = Number(tr.dataset.kw);
+      switchTab('eingabe');
+      const selJahr = document.getElementById('inpJahr');
+      selJahr.value = jahr;
+      selJahr.onchange();
+      document.getElementById('inpKW').value = kw;
+      fillEntryForm();
+    });
   });
 }
 
@@ -635,6 +708,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p =>
     p.classList.toggle('hidden', p.id !== 'tab-' + name));
   if (name === 'diagramme') renderCharts();
+  if (name === 'tabelle') renderTable();
 }
 
 function renderAll() {
@@ -643,6 +717,9 @@ function renderAll() {
   renderCategories();
   if (!document.getElementById('tab-diagramme').classList.contains('hidden')) {
     renderCharts();
+  }
+  if (!document.getElementById('tab-tabelle').classList.contains('hidden')) {
+    renderTable();
   }
 }
 

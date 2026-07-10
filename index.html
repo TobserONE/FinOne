@@ -17,6 +17,7 @@
     <nav>
       <button class="tab active" data-tab="eingabe">Eingabe</button>
       <button class="tab" data-tab="diagramme">Diagramme</button>
+      <button class="tab" data-tab="tabelle">Tabelle</button>
       <button class="tab" data-tab="kategorien">Kategorien</button>
       <button class="tab" data-tab="einstellungen">Einstellungen</button>
     </nav>
@@ -74,6 +75,19 @@
       <div class="card chart-card">
         <h2>Level 3 · Gesamtvermögen</h2>
         <div class="chart-wrap"><canvas id="chartL3"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ============ TABELLE ============ -->
+    <section id="tab-tabelle" class="tab-panel hidden">
+      <div class="card chart-controls">
+        <label>Zeitraum
+          <select id="tableRangeSelect"></select>
+        </label>
+        <span class="legend-hint">💚 Lohnwoche · Zeile antippen öffnet die Eingabe</span>
+      </div>
+      <div class="card table-card">
+        <div class="table-wrap" id="tableWrap"></div>
       </div>
     </section>
 
