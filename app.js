@@ -1,17 +1,8 @@
 /* Finanz-Tracker – Frontend-Logik */
 'use strict';
 
-const LS_CONFIG = 'finanzapp-config'; // alte Sheets-Zugangsdaten – nur noch fürs Vorbefüllen der Migration
+const LS_CONFIG = 'finanzapp-config';
 const LS_CACHE = 'finanzapp-cache';
-
-// Zugangsdaten des Supabase-Projekts (Dashboard → Settings → API).
-// Solange beide Werte leer sind, arbeitet die App rein lokal (Cache/Demo).
-const SUPABASE_URL = 'https://txnvnphlsqeysebdbswe.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR4bnZucGhsc3FleXNlYmRic3dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2ODk4MTMsImV4cCI6MjA5OTI2NTgxM30.0Yfa8d844Car8nlTBeagke7ZtSUHK-qCLeMkE4l_wOE';
-
-const sb = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
-let currentUser = null;
 
 const LEVEL_TITEL = {
   1: 'Level 1 · Konten & Cash',
@@ -29,6 +20,7 @@ const DEFAULT_KATEGORIEN = [
 ];
 
 const state = {
+  config: { url: '', token: '' },
   demo: false,
   categories: [],   // {name, level, aktiv}
   weekData: {},     // "2026-27" -> {jahr, kw, lohn, werte:{name: zahl}}
@@ -71,36 +63,7 @@ function parseNum(s) {
   return isNaN(n) ? null : n;
 }
 
-// ---------- API (Supabase) ----------
-
-async function sbLoadAll() {
-  const [k, w, d] = await Promise.all([
-    sb.from('kategorien').select('name,level,aktiv').order('pos'),
-    sb.from('wochen').select('jahr,kw,lohn'),
-    sb.from('daten').select('jahr,kw,kategorie,wert'),
-  ]);
-  for (const r of [k, w, d]) if (r.error) throw new Error(r.error.message);
-  return {
-    categories: k.data,
-    weeks: w.data,
-    entries: d.data.map(e => ({ jahr: e.jahr, kw: e.kw, kategorie: e.kategorie, wert: Number(e.wert) })),
-  };
-}
-
-// Aktuellen State in den localStorage-Cache schreiben (Offline-Ansicht)
-function cacheState() {
-  if (state.demo) return;
-  const weeks = Object.values(state.weekData);
-  const data = {
-    categories: state.categories,
-    weeks: weeks.map(w => ({ jahr: w.jahr, kw: w.kw, lohn: w.lohn })),
-    entries: [].concat(...weeks.map(w =>
-      Object.keys(w.werte).map(c => ({ jahr: w.jahr, kw: w.kw, kategorie: c, wert: w.werte[c] })))),
-  };
-  try { localStorage.setItem(LS_CACHE, JSON.stringify(data)); } catch (e) { /* voll */ }
-}
-
-// ---------- Google-Sheets-Zugriff (nur noch für die einmalige Migration) ----------
+// ---------- API ----------
 
 async function parseResponse(res) {
   const text = await res.text();
@@ -127,11 +90,26 @@ async function parseResponse(res) {
   return j.data;
 }
 
-async function sheetsGet(url, token) {
-  const u = url + '?token=' + encodeURIComponent(token) + '&action=all';
+async function apiGet() {
+  const u = state.config.url + '?token=' + encodeURIComponent(state.config.token) + '&action=all';
   let res;
   try {
     res = await fetch(u);
+  } catch (e) {
+    throw new Error('Anfrage kam nicht durch (Netzwerk/CORS). URL prüfen – sie muss mit ' +
+      'https://script.google.com/macros/s/ beginnen und auf /exec enden.');
+  }
+  return parseResponse(res);
+}
+
+async function apiPost(action, payload) {
+  // Body als String ohne Content-Type-Header => kein CORS-Preflight (Apps Script)
+  let res;
+  try {
+    res = await fetch(state.config.url, {
+      method: 'POST',
+      body: JSON.stringify(Object.assign({ token: state.config.token, action }, payload)),
+    });
   } catch (e) {
     throw new Error('Anfrage kam nicht durch (Netzwerk/CORS). URL prüfen – sie muss mit ' +
       'https://script.google.com/macros/s/ beginnen und auf /exec enden.');
@@ -157,9 +135,9 @@ function applyData(data) {
 
 async function refresh(showToast) {
   if (state.demo) return;
-  if (!sb || !currentUser) return;
+  if (!state.config.url) return;
   try {
-    applyData(await sbLoadAll());
+    applyData(await apiGet());
     renderAll();
     if (showToast) toast('Daten geladen ✓');
     setConnStatus('✅ Verbunden – ' + Object.keys(state.weekData).length + ' Wochen geladen.');
@@ -208,7 +186,7 @@ function endDemo() {
   if (cached) { try { applyData(JSON.parse(cached)); } catch (e) { /* egal */ } }
   document.getElementById('demoBanner').classList.add('hidden');
   renderAll();
-  if (sb && currentUser) refresh(false);
+  if (state.config.url) refresh(false);
 }
 
 // ---------- Eingabe-Tab ----------
@@ -248,8 +226,8 @@ function renderEntryForm() {
   const aktive = state.categories.filter(c => c.aktiv);
   if (!aktive.length) {
     wrap.innerHTML = `<div class="card"><p class="hint">Noch keine Kategorien geladen.
-      Bitte unter <strong>Einstellungen</strong> anmelden, den Demo-Modus starten
-      oder unter <strong>Kategorien</strong> welche anlegen.</p></div>`;
+      Bitte unter <strong>Einstellungen</strong> die Google-Sheets-Verbindung einrichten
+      oder den Demo-Modus starten.</p></div>`;
     return;
   }
   let html = '';
@@ -338,24 +316,13 @@ async function saveWeek() {
 
   if (state.demo) {
     toast('Demo: nur lokal gespeichert 🧪');
-  } else if (!sb || !currentUser) {
-    toast('Nicht angemeldet (Einstellungen) – Änderung nur lokal!', true);
+  } else if (!state.config.url) {
+    toast('Keine Verbindung konfiguriert (Einstellungen) – Änderung nur lokal!', true);
   } else {
     const btn = document.getElementById('btnSave');
     btn.disabled = true; btn.textContent = 'Speichern…';
     try {
-      const uid = currentUser.id;
-      const setRows = Object.keys(werte)
-        .filter(cat => werte[cat] !== null)
-        .map(cat => ({ user_id: uid, jahr, kw, kategorie: cat, wert: werte[cat] }));
-      const delCats = Object.keys(werte).filter(cat => werte[cat] === null);
-      let r = await sb.from('wochen').upsert({ user_id: uid, jahr, kw, lohn });
-      if (!r.error && setRows.length) r = await sb.from('daten').upsert(setRows);
-      if (!r.error && delCats.length) {
-        r = await sb.from('daten').delete().eq('jahr', jahr).eq('kw', kw).in('kategorie', delCats);
-      }
-      if (r.error) throw new Error(r.error.message);
-      cacheState();
+      applyData(await apiPost('saveWeek', { jahr, kw, lohn, werte }));
       toast('KW ' + kw + '/' + jahr + ' gespeichert ✓');
     } catch (err) {
       toast('Speichern fehlgeschlagen: ' + err.message, true);
@@ -427,7 +394,7 @@ function buildChart(canvasId, lvl, weeks) {
   const data = weeks.map(w => levelTotal(w, lvl));
   const farbe = LEVEL_FARBEN[lvl];
   const ptFarben = weeks.map(w => (w.lohn ? '#16a34a' : farbe));
-  const ptRadius = weeks.map(w => (w.lohn ? 5 : 3));
+  const ptRadius = weeks.map(() => 3);
 
   const chart = new Chart(canvas, {
     type: 'line',
@@ -585,13 +552,8 @@ function renderTable() {
 function renderCategories() {
   const wrap = document.getElementById('catList');
   if (!state.categories.length) {
-    wrap.innerHTML = `<div class="card"><p class="hint">Noch keine Kategorien – unter
-      <strong>Einstellungen</strong> anmelden bzw. den Demo-Modus starten, unten eine
-      eigene Kategorie anlegen oder mit den Standard-Kategorien beginnen:</p>
-      <div class="btn-row" style="margin-top: 12px">
-        <button id="btnSeedCats">Standard-Kategorien anlegen</button>
-      </div></div>`;
-    document.getElementById('btnSeedCats').onclick = seedDefaults;
+    wrap.innerHTML = `<div class="card"><p class="hint">Noch keine Kategorien –
+      erst verbinden (Einstellungen) oder Demo-Modus starten.</p></div>`;
     return;
   }
   let html = '';
@@ -646,46 +608,18 @@ function renderCategories() {
 }
 
 async function catUpdate(name, changes, applyLocal) {
-  if (state.demo || !sb || !currentUser) {
+  if (state.demo || !state.config.url) {
     applyLocal();
-    if (!state.demo) toast('Nicht angemeldet – Änderung nur lokal!', true);
+    if (!state.demo) toast('Keine Verbindung – Änderung nur lokal!', true);
   } else {
     try {
-      let r;
-      if (changes.newName) {
-        r = await sb.from('kategorien').update({ name: changes.newName }).eq('name', name);
-        if (!r.error) {
-          r = await sb.from('daten').update({ kategorie: changes.newName }).eq('kategorie', name);
-        }
-      } else {
-        r = await sb.from('kategorien').update(changes).eq('name', name);
-      }
-      if (r.error) throw new Error(r.error.message);
-      applyLocal();
-      cacheState();
+      applyData(await apiPost('updateCategory', Object.assign({ name }, changes)));
       toast('Kategorie aktualisiert ✓');
     } catch (err) {
       toast('Fehler: ' + err.message, true);
       renderCategories();
       return;
     }
-  }
-  renderAll();
-}
-
-async function seedDefaults() {
-  const neu = DEFAULT_KATEGORIEN.map(([name, level]) => ({ name, level, aktiv: true }));
-  if (state.demo || !sb || !currentUser) {
-    state.categories = neu;
-    if (!state.demo) toast('Nicht angemeldet – Kategorien nur lokal!', true);
-  } else {
-    const r = await sb.from('kategorien').upsert(
-      neu.map(c => Object.assign({ user_id: currentUser.id }, c)),
-      { onConflict: 'user_id,name' });
-    if (r.error) { toast('Fehler: ' + r.error.message, true); return; }
-    state.categories = neu;
-    cacheState();
-    toast('Standard-Kategorien angelegt ✓');
   }
   renderAll();
 }
@@ -699,16 +633,12 @@ async function addCategory(ev) {
     toast('Kategorie existiert bereits', true);
     return;
   }
-  if (state.demo || !sb || !currentUser) {
+  if (state.demo || !state.config.url) {
     state.categories.push({ name, level, aktiv: true });
-    if (!state.demo) toast('Nicht angemeldet – Kategorie nur lokal!', true);
+    if (!state.demo) toast('Keine Verbindung – Kategorie nur lokal!', true);
   } else {
     try {
-      const r = await sb.from('kategorien')
-        .insert({ user_id: currentUser.id, name, level, aktiv: true });
-      if (r.error) throw new Error(r.error.message);
-      state.categories.push({ name, level, aktiv: true });
-      cacheState();
+      applyData(await apiPost('addCategory', { name, level }));
       toast('Kategorie "' + name + '" angelegt ✓');
     } catch (err) {
       toast('Fehler: ' + err.message, true);
@@ -719,69 +649,17 @@ async function addCategory(ev) {
   renderAll();
 }
 
-// ---------- Einstellungen: Konto ----------
+// ---------- Einstellungen ----------
 
-function setConnStatus(txt) {
-  document.getElementById('connStatus').textContent = txt;
+function loadConfig() {
+  try {
+    const c = JSON.parse(localStorage.getItem(LS_CONFIG) || '{}');
+    state.config.url = c.url || '';
+    state.config.token = c.token || '';
+  } catch (e) { /* egal */ }
+  document.getElementById('cfgUrl').value = state.config.url;
+  document.getElementById('cfgToken').value = state.config.token;
 }
-
-function updateAuthUI() {
-  document.getElementById('authLoggedOut').classList.toggle('hidden', !!currentUser);
-  document.getElementById('authLoggedIn').classList.toggle('hidden', !currentUser);
-  if (!sb) {
-    setConnStatus('⚠️ Kein Supabase-Projekt hinterlegt – SUPABASE_URL und SUPABASE_ANON_KEY ' +
-      'oben in app.js eintragen (siehe Einrichtung unten).');
-  } else if (currentUser) {
-    document.getElementById('authUser').textContent = currentUser.email || '';
-  } else {
-    setConnStatus('Nicht angemeldet – Daten werden nur lokal angezeigt.');
-  }
-}
-
-function authErrorText(error) {
-  const m = (error && error.message) || '';
-  if (m.indexOf('Invalid login credentials') >= 0) return 'E-Mail oder Passwort falsch';
-  if (m.indexOf('already registered') >= 0) return 'Diese E-Mail ist bereits registriert';
-  if (m.indexOf('at least 6 characters') >= 0) return 'Passwort: mindestens 6 Zeichen';
-  if (m.indexOf('valid email') >= 0) return 'Bitte gültige E-Mail-Adresse eingeben';
-  if (m.indexOf('Email not confirmed') >= 0) return 'E-Mail noch nicht bestätigt – bitte Postfach prüfen';
-  return m || 'Unbekannter Fehler';
-}
-
-function authCredentials() {
-  const email = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPass').value;
-  if (!email || !password) { toast('Bitte E-Mail und Passwort eingeben', true); return null; }
-  return { email, password };
-}
-
-async function doLogin() {
-  if (!sb) { updateAuthUI(); return; }
-  const cred = authCredentials();
-  if (!cred) return;
-  const r = await sb.auth.signInWithPassword(cred);
-  if (r.error) { toast(authErrorText(r.error), true); return; }
-  document.getElementById('authPass').value = '';
-  toast('Angemeldet ✓');
-}
-
-async function doSignup() {
-  if (!sb) { updateAuthUI(); return; }
-  const cred = authCredentials();
-  if (!cred) return;
-  const r = await sb.auth.signUp(cred);
-  if (r.error) { toast(authErrorText(r.error), true); return; }
-  document.getElementById('authPass').value = '';
-  if (r.data && r.data.session) toast('Konto erstellt ✓');
-  else toast('Bestätigungs-E-Mail gesendet – bitte Postfach prüfen');
-}
-
-async function doLogout() {
-  await sb.auth.signOut();
-  toast('Abgemeldet – deine Daten bleiben lokal im Cache erhalten');
-}
-
-// ---------- Einstellungen: Migration aus Google Sheets ----------
 
 function normalizeScriptUrl(u) {
   u = u.trim();
@@ -791,64 +669,26 @@ function normalizeScriptUrl(u) {
   return u;
 }
 
-function prefillMigration() {
-  try {
-    const c = JSON.parse(localStorage.getItem(LS_CONFIG) || '{}');
-    document.getElementById('migUrl').value = c.url || '';
-    document.getElementById('migToken').value = c.token || '';
-  } catch (e) { /* egal */ }
-}
-
-function setMigStatus(txt) {
-  document.getElementById('migStatus').textContent = txt;
-}
-
-async function migrateFromSheets() {
-  if (!sb || !currentUser) { toast('Bitte zuerst oben anmelden', true); return; }
-  const url = normalizeScriptUrl(document.getElementById('migUrl').value);
-  const token = document.getElementById('migToken').value.trim();
-  if (!url || !token) { toast('Apps-Script-URL und Token eingeben', true); return; }
-
-  const btn = document.getElementById('btnMigrate');
-  btn.disabled = true;
-  try {
-    setMigStatus('Lade Daten aus Google Sheets …');
-    const data = await sheetsGet(url, token);
-    const uid = currentUser.id;
-
-    const cats = (data.categories || []).map(c =>
-      ({ user_id: uid, name: c.name, level: c.level, aktiv: !!c.aktiv }));
-    const weeks = (data.weeks || []).map(w =>
-      ({ user_id: uid, jahr: w.jahr, kw: w.kw, lohn: !!w.lohn }));
-    const entries = (data.entries || []).map(e =>
-      ({ user_id: uid, jahr: e.jahr, kw: e.kw, kategorie: e.kategorie, wert: e.wert }));
-
-    setMigStatus('Übertrage ' + cats.length + ' Kategorien …');
-    let r = await sb.from('kategorien').upsert(cats, { onConflict: 'user_id,name' });
-    if (r.error) throw new Error(r.error.message);
-
-    setMigStatus('Übertrage ' + weeks.length + ' Wochen …');
-    r = await sb.from('wochen').upsert(weeks, { onConflict: 'user_id,jahr,kw' });
-    if (r.error) throw new Error(r.error.message);
-
-    for (let i = 0; i < entries.length; i += 500) {
-      setMigStatus('Übertrage Werte ' + (i + 1) + '–' +
-        Math.min(i + 500, entries.length) + ' von ' + entries.length + ' …');
-      r = await sb.from('daten').upsert(entries.slice(i, i + 500),
-        { onConflict: 'user_id,jahr,kw,kategorie' });
-      if (r.error) throw new Error(r.error.message);
-    }
-
-    await refresh(false);
-    setMigStatus('✅ Migration abgeschlossen: ' + cats.length + ' Kategorien, ' +
-      weeks.length + ' Wochen, ' + entries.length + ' Werte übernommen.');
-    toast('Migration abgeschlossen ✓');
-  } catch (err) {
-    setMigStatus('❌ ' + err.message);
-    toast('Migration fehlgeschlagen: ' + err.message, true);
-  } finally {
-    btn.disabled = false;
+async function saveConfig() {
+  const rawUrl = document.getElementById('cfgUrl').value;
+  state.config.url = normalizeScriptUrl(rawUrl);
+  document.getElementById('cfgUrl').value = state.config.url;
+  state.config.token = document.getElementById('cfgToken').value.trim();
+  if (state.config.url.endsWith('/dev')) {
+    setConnStatus('⚠️ Das ist die Test-URL (/dev) – bitte die Bereitstellungs-URL verwenden, die auf /exec endet.');
+    toast('URL endet auf /dev statt /exec', true);
+    localStorage.setItem(LS_CONFIG, JSON.stringify(state.config));
+    return;
   }
+  localStorage.setItem(LS_CONFIG, JSON.stringify(state.config));
+  if (!state.config.url) { setConnStatus('Keine URL eingetragen.'); return; }
+  if (state.demo) endDemo();
+  setConnStatus('Verbinde…');
+  await refresh(true);
+}
+
+function setConnStatus(txt) {
+  document.getElementById('connStatus').textContent = txt;
 }
 
 // ---------- UI-Gerüst ----------
@@ -888,29 +728,16 @@ function init() {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
   document.getElementById('btnSave').addEventListener('click', saveWeek);
   document.getElementById('addCatForm').addEventListener('submit', addCategory);
-  document.getElementById('btnLogin').addEventListener('click', doLogin);
-  document.getElementById('btnSignup').addEventListener('click', doSignup);
-  document.getElementById('btnLogout').addEventListener('click', doLogout);
-  document.getElementById('btnMigrate').addEventListener('click', migrateFromSheets);
+  document.getElementById('btnCfgSave').addEventListener('click', saveConfig);
   document.getElementById('btnRefresh').addEventListener('click', () => refresh(true));
   document.getElementById('btnDemo').addEventListener('click', startDemo);
   document.getElementById('btnDemoEnde').addEventListener('click', endDemo);
 
-  prefillMigration();
-  updateAuthUI();
+  loadConfig();
   const cached = localStorage.getItem(LS_CACHE);
   if (cached) { try { applyData(JSON.parse(cached)); } catch (e) { /* egal */ } }
   renderAll();
-
-  if (sb) {
-    sb.auth.onAuthStateChange((_ev, session) => {
-      const vorher = currentUser && currentUser.id;
-      currentUser = session ? session.user : null;
-      updateAuthUI();
-      // Nur bei echtem Nutzerwechsel laden, nicht bei jedem Token-Refresh
-      if (currentUser && currentUser.id !== vorher) refresh(false);
-    });
-  }
+  if (state.config.url) refresh(false);
 }
 
 document.addEventListener('DOMContentLoaded', init);
