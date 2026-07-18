@@ -561,8 +561,14 @@ function renderCategories() {
     const cats = state.categories.filter(c => c.level === lvl);
     html += `<div class="card">
       <h2><span class="level-badge l${lvl}">L${lvl}</span> ${LEVEL_TITEL[lvl]}</h2>
-      ${cats.length ? cats.map(c => `
+      ${cats.length ? cats.map((c, ci) => `
         <div class="cat-row${c.aktiv ? '' : ' inaktiv'}">
+          <span class="move-btns">
+            <button class="small" data-cat-move="${c.name}" data-dir="-1"
+              title="Nach oben"${ci === 0 ? ' disabled' : ''}>▲</button>
+            <button class="small" data-cat-move="${c.name}" data-dir="1"
+              title="Nach unten"${ci === cats.length - 1 ? ' disabled' : ''}>▼</button>
+          </span>
           <span class="cat-name">${c.name}</span>
           <select data-cat-level="${c.name}">
             ${[1, 2, 3].map(l => `<option value="${l}"${l === c.level ? ' selected' : ''}>Level ${l}</option>`).join('')}
@@ -574,6 +580,9 @@ function renderCategories() {
   }
   wrap.innerHTML = html;
 
+  wrap.querySelectorAll('[data-cat-move]').forEach(btn => {
+    btn.onclick = () => moveCategory(btn.dataset.catMove, Number(btn.dataset.dir));
+  });
   wrap.querySelectorAll('[data-cat-rename]').forEach(btn => {
     btn.onclick = async () => {
       const alt = btn.dataset.catRename;
@@ -605,6 +614,28 @@ function renderCategories() {
       });
     };
   });
+}
+
+async function moveCategory(name, dir) {
+  const cats = state.categories;
+  const i = cats.findIndex(c => c.name === name);
+  if (i < 0) return;
+  // Nachbar-Kategorie im selben Level suchen (dazwischen können andere Level liegen)
+  let j = i + dir;
+  while (j >= 0 && j < cats.length && cats[j].level !== cats[i].level) j += dir;
+  if (j < 0 || j >= cats.length) return; // schon am Rand des Levels
+  [cats[i], cats[j]] = [cats[j], cats[i]];
+  renderAll();
+  if (state.demo || !state.config.url) {
+    if (!state.demo) toast('Keine Verbindung – Reihenfolge nur lokal!', true);
+    return;
+  }
+  try {
+    applyData(await apiPost('reorderCategories', { namen: cats.map(c => c.name) }));
+    renderAll();
+  } catch (err) {
+    toast('Reihenfolge speichern fehlgeschlagen: ' + err.message, true);
+  }
 }
 
 async function catUpdate(name, changes, applyLocal) {

@@ -1,5 +1,5 @@
 /* Finanz-Tracker Service Worker – cached die App-Shell für Offline-Start */
-const CACHE = 'finanz-tracker-v10';
+const CACHE = 'finanz-tracker-v11';
 const SHELL = [
   './',
   './index.html',

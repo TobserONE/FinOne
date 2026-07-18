@@ -358,6 +358,10 @@ button.small {
 
 .cat-row .cat-name { flex: 1; min-width: 120px; font-weight: 500; }
 
+.move-btns { display: flex; gap: 4px; }
+.move-btns button { padding: 5px 8px; line-height: 1; }
+.move-btns button:disabled { opacity: .3; cursor: default; }
+
 .cat-row.inaktiv .cat-name {
   color: var(--muted);
   text-decoration: line-through;
@@ -534,7 +538,7 @@ button.small {
 
   /* Kategorien */
   .cat-row { gap: 8px; }
-  .cat-row .cat-name { flex-basis: 100%; min-width: 0; }
+  .cat-row .cat-name { flex: 1; min-width: 0; }
   .cat-row button.small { min-height: 38px; }
 
   .add-cat-form input { min-width: 0; flex-basis: 100%; }
